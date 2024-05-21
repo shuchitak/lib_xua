@@ -780,6 +780,11 @@ void XUA_Buffer_Decouple(chanend c_mix_out
 #endif
 #endif
 
+    for(int i=1; i<(MAX_DEVICE_AUD_PACKET_SIZE_IN >> 2); i++)
+    {
+        inZeroBuff[i] = 5678 << 8;
+    }
+
     while(1)
     {
         int tmp;
