@@ -367,6 +367,8 @@ void clockGen ( streaming chanend ?c_spdif_rx,
     restart_sigma_delta(c_sw_pll, MCLK_48); /* default to 48kHz - this will be reset shortly when host selects rate */
 #endif
 
+    int g_valid = 5678;
+
     while(1)
     {
         select
@@ -530,6 +532,7 @@ void clockGen ( streaming chanend ?c_spdif_rx,
                     /* Returns 1 if valid clock found */
                     valid = validSamples(adatCounters, CLOCK_ADAT);
                     setClockValidity(c_clk_int, CLOCK_ADAT, valid, clkMode);
+                    g_valid = valid;
 #endif
                 }
                 break;
@@ -833,9 +836,9 @@ void clockGen ( streaming chanend ?c_spdif_rx,
                 if (adatUnderflow)
                 {
                     /* ADAT underflowing, send out zero samples */
-                    g_digData[2] = 1234 << 8;
+                    g_digData[2] = g_valid << 8;
                     g_digData[3] = 1234 << 8;
-                    g_digData[4] = 1234 << 8;
+                    g_digData[4] = g_valid << 8;
                     g_digData[5] = 1234 << 8;
                     g_digData[6] = 1234 << 8;
                     g_digData[7] = 1234 << 8;
