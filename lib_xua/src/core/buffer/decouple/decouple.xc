@@ -23,6 +23,8 @@
 #include "user_hid.h"
 #endif
 
+#include "xua_cmd_utils.h"
+
 /* Volume and mute tables */
 #if (OUT_VOLUME_IN_MIXER == 0) && (OUTPUT_VOLUME_CONTROL == 1)
 unsigned int multOut[NUM_USB_CHAN_OUT + 1];
@@ -672,16 +674,19 @@ static void check_and_signal_stream_event_to_audio(chanend c_mix_out, unsigned d
     {
         /* Forward stream active command to audio if needed - this will cause the audio loop to break */
         inuint(c_mix_out);
+        xua_cmd_t cmd;
+
         if(g_any_stream_active_current)
         {
-            outct(c_mix_out, XUA_AUD_SET_AUDIO_START);
-            outuint(c_mix_out, dsdMode);
-            outuint(c_mix_out, sampResOut);
+            cmd.cmd = XUA_AUD_SET_AUDIO_START;
+            cmd.data[0] = dsdMode;
+            cmd.data[1] = sampResOut;
         }
         else
         {
-            outct(c_mix_out, XUA_AUD_SET_AUDIO_STOP);
+            cmd.cmd = XUA_AUD_SET_AUDIO_STOP;
         }
+        xua_send_cmd(c_mix_out, &cmd);
         chkct(c_mix_out, XS1_CT_END);
     }
     g_any_stream_active_old = g_any_stream_active_current;
@@ -811,8 +816,10 @@ void XUA_Buffer_Decouple(chanend c_mix_out
                 /* Pass on to mixer */
                 DISABLE_INTERRUPTS();
                 inuint(c_mix_out);
-                outct(c_mix_out, XUA_AUDCTL_SET_SAMPLE_FREQ);
-                outuint(c_mix_out, sampFreq);
+                xua_cmd_t cmd;
+                cmd.cmd = XUA_AUDCTL_SET_SAMPLE_FREQ;
+                cmd.data[0] = sampFreq;
+                xua_send_cmd(c_mix_out, &cmd);
 
                 if(sampFreq != AUDIO_STOP_FOR_DFU)
                 {

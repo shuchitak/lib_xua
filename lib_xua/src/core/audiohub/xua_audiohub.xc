@@ -42,6 +42,7 @@
 
 #include "xua_commands.h"
 #include "xc_ptr.h"
+#include "xua_cmd_utils.h"
 
 #define DEBUG_UNIT XUA_AUDIOHUB
 #include "debug_print.h"
@@ -562,23 +563,27 @@ static void receive_command(unsigned command,
                             unsigned &audioActive)
 {
     debug_printf("receive_command: %d\n", command);
-    if(command == XUA_AUDCTL_SET_SAMPLE_FREQ)
+    xua_cmd_t cmd;
+    cmd.cmd = command;
+    xua_receive_cmd_only_data(c_aud, &cmd);
+
+    if(cmd.cmd == XUA_AUDCTL_SET_SAMPLE_FREQ)
     {
-        curSamFreq = inuint(c_aud) * AUD_TO_USB_RATIO;
+        curSamFreq = cmd.data[0] * AUD_TO_USB_RATIO;
         debug_printf("receive_command set sr: %d\n", curSamFreq);
     }
-    else if(command == XUA_AUD_SET_AUDIO_START)
+    else if(cmd.cmd == XUA_AUD_SET_AUDIO_START)
     {
         /* Off = 0
          * DOP = 1
          * Native = 2
          */
-        dsdMode = inuint(c_aud);
-        curSamRes_DAC = inuint(c_aud);
+        dsdMode = cmd.data[0];
+        curSamRes_DAC = cmd.data[1];
         audioActive = 1;
         debug_printf("aud stream start\n");
     }
-    else if (command == XUA_AUD_SET_AUDIO_STOP)
+    else if (cmd.cmd == XUA_AUD_SET_AUDIO_STOP)
     {
         debug_printf("aud stream stop\n");
         if(XUA_LOW_POWER_NON_STREAMING)
@@ -588,7 +593,7 @@ static void receive_command(unsigned command,
     }
     else
     {
-        debug_printf("aud unhandled cmd  %u\n", command);
+        debug_printf("aud unhandled cmd  %u\n", cmd.cmd);
     }
     /* Not we do not ACK back here - it is done when we re-start audio */
 }

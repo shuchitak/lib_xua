@@ -6,6 +6,7 @@
 #include <timer.h>
 #include "xua.h"
 #include "xua_commands.h" // Internal header, not part of lib_xua user API
+#include "xua_cmd_utils.h"
 
 #define TOTAL_TEST_FRAMES 100
 
@@ -70,16 +71,17 @@ void send_audio_frames(chanend c_out, unsigned num_frames)
 void send_cmd(chanend c_out, unsigned cmd, unsigned val)
 {
     inuint(c_out); // get and discard underflow word
-    outct(c_out, cmd);
+    xua_cmd_t c;
+    c.cmd = cmd;
     switch(cmd)
     {
       case XUA_AUDCTL_SET_SAMPLE_FREQ:
         printstr("sent XUA_AUDCTL_SET_SAMPLE_FREQ "); printintln(val);
-        outuint(c_out, val); // note 0x12345678 for DFU
+        c.data[0] = val;
         break;
       case XUA_AUD_SET_AUDIO_START:
-        outuint(c_out, 0);
-        outuint(c_out, val);
+        c.data[0] = 0;
+        c.data[1] = val;
         printstr("sent XUA_AUD_SET_AUDIO_START\n");
         break;
       case XUA_AUD_SET_AUDIO_STOP:
@@ -89,21 +91,23 @@ void send_cmd(chanend c_out, unsigned cmd, unsigned val)
         printstr("ERROR - incorrect command in send\n");
         break;
     }
+    xua_send_cmd(c_out, &c);
     chkct(c_out, XS1_CT_END);
 }
 
 void send_cmd_no_audio(chanend c_out, unsigned cmd, unsigned val)
 {
-    outct(c_out, cmd);
+    xua_cmd_t c;
+    c.cmd = cmd;
     switch(cmd)
     {
       case XUA_AUDCTL_SET_SAMPLE_FREQ:
         printstr("sent XUA_AUDCTL_SET_SAMPLE_FREQ "); printintln(val);
-        outuint(c_out, val); // note 0x12345678 for DFU
+        c.data[0] = val; // note 0x12345678 for DFU
         break;
       case XUA_AUD_SET_AUDIO_START:
-        outuint(c_out, 0);
-        outuint(c_out, val);
+        c.data[0] = 0;
+        c.data[1] = val;
         printstr("sent XUA_AUD_SET_AUDIO_START\n");
         break;
       case XUA_AUD_SET_AUDIO_STOP:
@@ -113,6 +117,7 @@ void send_cmd_no_audio(chanend c_out, unsigned cmd, unsigned val)
         printstr("ERROR - incorrect command in send\n");
         break;
     }
+    xua_send_cmd(c_out, &c);
     chkct(c_out, XS1_CT_END);
 }
 
@@ -120,7 +125,7 @@ void generator(chanend c_out)
 {
 #if NO_STREAMS
   send_cmd_no_audio(c_out, XUA_AUDCTL_SET_SAMPLE_FREQ, AUDIO_STOP_FOR_DFU); // We will now be in dummy deliver
-  send_cmd_no_audio(c_out, XUA_AUDCTL_SET_SAMPLE_FREQ, 44100); // send second SR change to make sure it can ignore it 
+  send_cmd_no_audio(c_out, XUA_AUDCTL_SET_SAMPLE_FREQ, 44100); // send second SR change to make sure it can ignore it
   send_cmd_no_audio(c_out, XUA_AUD_SET_AUDIO_START, 24); // Send stream start to see if we ignore it
   send_cmd_no_audio(c_out, XUA_AUD_SET_AUDIO_STOP, 0); // More to ignore
 #else
@@ -139,7 +144,7 @@ void generator(chanend c_out)
   send_audio_frames(c_out, 1);
   send_cmd(c_out, XUA_AUDCTL_SET_SAMPLE_FREQ, AUDIO_STOP_FOR_DFU); // make sure we can enter DFU from idle
   send_audio_frames(c_out, 5);
-  send_cmd(c_out, XUA_AUDCTL_SET_SAMPLE_FREQ, 44100); // send second SR change to make sure it can ignore it 
+  send_cmd(c_out, XUA_AUDCTL_SET_SAMPLE_FREQ, 44100); // send second SR change to make sure it can ignore it
   send_audio_frames(c_out, 5);
   send_cmd(c_out, XUA_AUD_SET_AUDIO_STOP, 0); // Ignore this too
   send_cmd(c_out, XUA_AUD_SET_AUDIO_START, 0); // Ignore this too

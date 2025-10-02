@@ -10,6 +10,7 @@
 #include "xua_commands.h"
 #include "xud.h"
 #include "testct_byref.h"
+#include "xua_cmd_utils.h"
 
 #if XUA_HID_ENABLED
 #include "xua_hid_report.h"
@@ -421,7 +422,9 @@ void XUA_Buffer_Ep(
             {
                 if(cmd == XUA_AUDCTL_SET_SAMPLE_FREQ)
                 {
-                    unsigned receivedSampleFreq = inuint(c_aud_ctl);
+                    xua_cmd_t c;
+                    xua_receive_cmd_only_data(c_aud_ctl, &c);
+                    unsigned receivedSampleFreq = c.data[0];
 
 #if (MAX_FREQ != MIN_FREQ)
                     /* Don't update things for DFU command.. */

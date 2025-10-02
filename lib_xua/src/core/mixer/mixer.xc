@@ -7,6 +7,7 @@
 #include "xua.h"
 #include "xua_commands.h"
 #include "dbcalc.h"
+#include "xua_cmd_utils.h"
 
 /* FAST_MIXER has a bit of a nasty implentation but is more efficient */
 #ifndef FAST_MIXER
@@ -410,7 +411,7 @@ static inline void do_output_volume_control(int out_ch_index)
 static void mixer1(chanend c_host, chanend c_mix_ctl, chanend ?c_mixer2, chanend c_audio)
 {
     int cmd_pending_flag = 0;
-    int pending_cmd[3]; // command + a max of 2 extra values
+    xua_cmd_t pending_cmd;
 
     int mixer1_mix2_flag = (DEFAULT_FREQ > 96000);
 #if (MAX_MIX_COUNT > 0)
@@ -455,31 +456,10 @@ static void mixer1(chanend c_host, chanend c_mix_ctl, chanend ?c_mixer2, chanend
         else
         {
             // forward cmd from last exchange with decoupler to audio
-            switch(pending_cmd[0])
-            {
-                case XUA_AUDCTL_SET_SAMPLE_FREQ:
-                    outct(c_audio, pending_cmd[0]);
-                    outuint(c_audio, pending_cmd[1]);
-                    break;
+            xua_send_cmd(c_audio, &pending_cmd);
 
-                case XUA_AUD_SET_AUDIO_START:
-                    /* Inform mixer2 (or audio()) about change */
-                    outct(c_audio, pending_cmd[0]);
-                    outuint(c_audio, pending_cmd[1]);
-                    outuint(c_audio, pending_cmd[2]);
-                    break;
-
-                case XUA_AUD_SET_AUDIO_STOP:
-                    /* Pass on command */
-                    outct(c_audio, pending_cmd[0]);
-                    break;
-
-                default:
-                    break;
-            }
             chkct(c_audio, XS1_CT_END);
             outct(c_host, XS1_CT_END); // Only now ack back to the decoupler.
-                                       // So in case of a command, the decoupler remains blocked for an extra sample period.
             cmd_pending_flag = 0;
             continue;
         }
@@ -645,30 +625,10 @@ static void mixer1(chanend c_host, chanend c_mix_ctl, chanend ?c_mixer2, chanend
         /* Get response from decouple */
         if(testct(c_host))
         {
-            int sampFreq;
-            unsigned command = inct(c_host);
             cmd_pending_flag = 1; // set pending flag. Command will be forwarded to audihub in the next sample period.
-            pending_cmd[0] = command;
-
-            switch(command)
-            {
-                case XUA_AUDCTL_SET_SAMPLE_FREQ:
-                    sampFreq = inuint(c_host);
-                    mixer1_mix2_flag = sampFreq > 96000;
-                    pending_cmd[1] = sampFreq;
-                    break;
-
-                case XUA_AUD_SET_AUDIO_START:
-                    /* Inform mixer2 (or audio()) about change */
-                    pending_cmd[1] = inuint(c_host);
-                    pending_cmd[2] = inuint(c_host);
-                    break;
-
-                case XUA_AUD_SET_AUDIO_STOP:
-                    break;
-
-                default:
-                    break;
+            xua_receive_cmd(c_host, &pending_cmd);
+            if(pending_cmd.cmd == XUA_AUDCTL_SET_SAMPLE_FREQ) {
+                mixer1_mix2_flag = pending_cmd.data[0] > 96000;
             }
 
 #pragma loop unroll

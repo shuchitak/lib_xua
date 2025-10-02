@@ -14,6 +14,7 @@
 #include "usbaudio10.h"
 #include "dbcalc.h"
 #include "xua_commands.h"
+#include "xua_cmd_utils.h"
 
 #define CS_XU_MIXSEL (0x06)
 
@@ -389,8 +390,10 @@ int AudioClassRequests_2(XUD_ep ep0_out, XUD_ep ep0_in, USB_SetupPacket_t &sp, c
                                         }
                                         outct(c_clk_ctl, XS1_CT_END);
 #endif
-                                        outct(c_aud_ctl, XUA_AUDCTL_SET_SAMPLE_FREQ);
-                                        outuint(c_aud_ctl, g_curSamFreq);
+                                        xua_cmd_t cmd;
+                                        cmd.cmd = XUA_AUDCTL_SET_SAMPLE_FREQ;
+                                        cmd.data[0] = g_curSamFreq;
+                                        xua_send_cmd(c_aud_ctl, &cmd);
 
                                         /* Wait for handshake back - i.e. PLL locked and clocks okay */
                                         chkct(c_aud_ctl, XS1_CT_END);
@@ -1149,10 +1152,11 @@ int AudioEndpointRequests_1(XUD_ep ep0_out, XUD_ep ep0_in, USB_SetupPacket_t &sp
                             if(curSamFreq48000Family || curSamFreq44100Family)
                             {
                                 g_curSamFreq = newSampleRate;
-
                                 /* Instruct audio thread to change sample freq */
-                                outct(c_aud_ctl, XUA_AUDCTL_SET_SAMPLE_FREQ);
-                                outuint(c_aud_ctl, g_curSamFreq);
+                                xua_cmd_t cmd;
+                                cmd.cmd = XUA_AUDCTL_SET_SAMPLE_FREQ;
+                                cmd.data[0] = g_curSamFreq;
+                                xua_send_cmd(c_aud_ctl, &cmd);
 
                                 /* Wait for handshake back - i.e. pll locked and clocks okay */
                                 chkct(c_aud_ctl, XS1_CT_END);

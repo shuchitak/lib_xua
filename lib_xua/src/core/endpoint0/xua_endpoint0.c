@@ -55,7 +55,7 @@
 #define outct(c, x)     asm ("outct res[%0], %1" :: "r" (c), "r" (x))
 #define chkct(c, x)     asm ("chkct res[%0], %1" :: "r" (c), "r" (x))
 #endif
-
+#include "xua_cmd_utils.h"
 
 /* If DFU_PID not defined, standard PID used.. this is probably what we want.. */
 #ifndef DFU_PID
@@ -539,8 +539,10 @@ void XUA_Endpoint0_init(chanend c_ep0_out, chanend c_ep0_in, NULLABLE_RESOURCE(c
         assert(((unsigned)c_aud_ctl != 0) && msg("DFU not supported when c_aud_ctl is null"));
 
         /* Stop audio */
-        outct(c_aud_ctl, XUA_AUDCTL_SET_SAMPLE_FREQ);
-        outuint(c_aud_ctl, AUDIO_STOP_FOR_DFU);
+        xua_cmd_t cmd;
+        cmd.cmd = XUA_AUDCTL_SET_SAMPLE_FREQ;
+        cmd.data[0] = AUDIO_STOP_FOR_DFU;
+        xua_send_cmd(c_aud_ctl, &cmd);
         /* No Handshake */
         DFU_mode_active = 1;
     }
@@ -855,8 +857,10 @@ void XUA_Endpoint0_loop(XUD_Result_t result, USB_SetupPacket_t sp, chanend c_ep0
                              */
                             assert((c_aud_ctl != null) && msg("DFU not supported when c_aud_ctl is null"));
                             // Stop audio
-                            outct(c_aud_ctl, XUA_AUDCTL_SET_SAMPLE_FREQ);
-                            outuint(c_aud_ctl, AUDIO_STOP_FOR_DFU);
+                            xua_cmd_t cmd;
+                            cmd.cmd = XUA_AUDCTL_SET_SAMPLE_FREQ;
+                            cmd.data[0] = AUDIO_STOP_FOR_DFU;
+                            xua_send_cmd(c_aud_ctl, &cmd);
                             // Handshake
                             chkct(c_aud_ctl, XS1_CT_END);
                             notify_audio_stop_for_DFU = 1;  // So we notify AUDIO_STOP_FOR_DFU only once
