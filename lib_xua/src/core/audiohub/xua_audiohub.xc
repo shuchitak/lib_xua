@@ -52,6 +52,8 @@
     #define _XUA_ENABLE_I2S_TIMING_CHECK (0)
 #endif
 
+#define RUN_DFU_HANDLER_AS_COMBINABLE (1)
+
 #define OUT_CHAN_COUNT (I2S_CHANS_DAC + (8*XUA_ADAT_TX_EN) + (2*XUA_SPDIF_TX_EN))
 unsigned samplesOut[XUA_MAX(NUM_USB_CHAN_OUT, OUT_CHAN_COUNT)];
 
@@ -1236,8 +1238,12 @@ static void receive_command(unsigned command,
 /* This function is a dummy version of the deliver thread that does not
    connect to the codec ports. It is used during DFU reset and during idle non-streaming mode, if enabled.
    Note there are two paths through depending on dfuMode.*/
+#if RUN_DFU_HANDLER_AS_COMBINABLE
 [[combinable]]
+static void dummy_deliver(chanend ?c_aud, unsigned sampFreq, unsigned dfuMode, unsigned &command)
+#else
 static void dummy_deliver(chanend ?c_aud, unsigned sampFreq, unsigned dfuMode, unsigned &command, server interface i_dfu i, chanend ?c_user_cmd)
+#endif
 {
     const int wait_ticks = XS1_TIMER_HZ / sampFreq;
     timer tmr;
@@ -1259,6 +1265,7 @@ static void dummy_deliver(chanend ?c_aud, unsigned sampFreq, unsigned dfuMode, u
     while (1)
     {
         /* Note, a select is used such that this task is combinable */
+        #pragma ordered
         select
         {
             case COMPLETE_SAMPLE_TRANSFER(c_aud, 0, command):   /* Check for command & transfer the samples & UBM */
@@ -1289,6 +1296,7 @@ static void dummy_deliver(chanend ?c_aud, unsigned sampFreq, unsigned dfuMode, u
                     StartSampleTransfer(c_aud, 0);
                 }
             break;
+#if !RUN_DFU_HANDLER_AS_COMBINABLE
 #if (XUA_XUD_TILE_NUM != 0) && (XUA_AUDIO_IO_TILE_NUM == 0)
             case i.HandleDfuRequest(USB_SetupPacket_t &sp, unsigned data_buffer[], unsigned data_buffer_length, unsigned dfuState)
                 -> {unsigned reset_device_after_ack, int return_data_len, int dfu_reset_override, int returnVal, unsigned newDfuState}:
@@ -1390,7 +1398,7 @@ static void dummy_deliver(chanend ?c_aud, unsigned sampFreq, unsigned dfuMode, u
            case i.finish():
                 return;
 #endif
-
+#endif
         }
     }
 }
@@ -1423,14 +1431,21 @@ void check_and_enter_dfu(unsigned curSamFreq, chanend c_aud, server interface i_
         unsigned command = XUA_AUDCTL_NO_COMMAND;
         while (1)
         {
+#if RUN_DFU_HANDLER_AS_COMBINABLE
             [[combine]]
+#endif
             par
             {
-/*#if (XUA_XUD_TILE_NUM != 0) && (XUA_AUDIO_IO_TILE_NUM == 0)
+#if RUN_DFU_HANDLER_AS_COMBINABLE
+#if (XUA_XUD_TILE_NUM != 0) && (XUA_AUDIO_IO_TILE_NUM == 0)
                 DFUHandler(dfuInterface, null);
-#endif*/
+#endif
                 /* This never exits because we set DFU mode*/
+                dummy_deliver(c_aud, 48000, 1, command);
+#else
                 dummy_deliver(c_aud, 48000, 1, command, dfuInterface, null);
+#endif
+
             }
             /* Note, we shouldn't reach here. Audio, once stopped for DFU, cannot be resumed */
         }
@@ -1503,7 +1518,12 @@ void XUA_AudioHub(chanend ?c_aud, clock ?clk_audio_mclk, clock ?clk_audio_bclk,
                 firstRun = 0;
             }
             /* Now run dummy loop with no IO. This is sufficient to poll for commands from decouple */
+#if RUN_DFU_HANDLER_AS_COMBINABLE
+            dummy_deliver(c_aud, 1000, 0, command);  /* Run loop at 1kHz for min power and exit if command */
+#else
             dummy_deliver(c_aud, 1000, 0, command, dfuInterface, null);  /* Run loop at 1kHz for min power and exit if command */
+#endif
+
             receive_command(command, c_aud, curSamFreq, dsdMode, curSamRes_DAC, audioActive);
 #if (XUA_DFU_EN == 1)
             check_and_enter_dfu(curSamFreq, c_aud, dfuInterface);
