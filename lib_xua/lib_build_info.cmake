@@ -38,7 +38,7 @@ set(LIB_OPTIONAL_HEADERS    xua_conf.h
 
 set(LIB_DEPENDENT_MODULES "lib_adat(2.0.1)"
                           "lib_locks(2.4.0)"
-                          "lib_logging(3.4.0)"
+                          #"lib_logging(3.4.0)"
                           "lib_spdif(7.0.0)"
                           "lib_sw_pll(2.4.1)"
                           "lib_xassert(4.3.2)"
